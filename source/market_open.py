@@ -1,92 +1,108 @@
 import datetime
 import pytz
+import sys
+import os
+import time
 import holidays
 
 def is_weekend():
-    local_timezone = pytz.timezone('Europe/Amsterdam')
-    current_datetime = datetime.datetime.now(local_timezone)
-    current_day = current_datetime.strftime("%A")
-    if current_day in ["Saturday", "Sunday"]:
-        return True
-    else:
-        return False
+    """
+    Checks if today is a weekend (Saturday or Sunday).
 
-def is_us_holiday(date, year=2023):
+    Returns:
+        bool: True if today is Saturday or Sunday, False otherwise.
+    """
+    local_timezone = pytz.timezone('Europe/Paris')
+    current_datetime = datetime.datetime.now(local_timezone)
+    return current_datetime.weekday() >= 5  # 5 = Saturday, 6 = Sunday
+
+
+def is_us_holiday(date, year=None):
+    """
+    Checks if a given date is a US holiday.
+
+    Args:
+        date (datetime.date): Date to check.
+        year (int, optional): Year of the holiday calendar. Defaults to current year.
+
+    Returns:
+        bool: True if the date is a US holiday, False otherwise.
+    """
+    if year is None:
+        year = date.year
     us_holidays = holidays.US(years=year)
-    if date in us_holidays:
-        return True
-    else:
-        return False
+    return date in us_holidays
+
 
 def calculate_time_difference(desired_time):
+    """
+    Calculates the time difference between the current UTC time and a desired UTC time.
+
+    Args:
+        desired_time (datetime.time): Desired time in UTC.
+
+    Returns:
+        datetime.timedelta: Time difference rounded to seconds.
+    """
     current_time_utc = datetime.datetime.now(datetime.timezone.utc)
     current_date = datetime.datetime.now().date()
     desired_time_utc = datetime.datetime.combine(current_date, desired_time, tzinfo=datetime.timezone.utc)
     time_difference = desired_time_utc - current_time_utc
-    rounded_duration = datetime.timedelta(seconds=int(time_difference.total_seconds()))
-    return rounded_duration
+    return datetime.timedelta(seconds=int(time_difference.total_seconds()))
+
 
 def market_is_open(print_event=False):
+    """
+    Determines if the market is currently open based on time, weekend, and US holiday status.
 
-    local_timezone = pytz.timezone('Europe/Amsterdam')
-    current_time = datetime.datetime.now(local_timezone)
-    utc_timezone = pytz.utc
+    Args:
+        print_event (bool, optional): If True, prints the market status. Defaults to False.
 
-    current_time_utc = current_time.astimezone(utc_timezone)
+    Returns:
+        bool: True if the market is open, False otherwise.
+    """
+    local_timezone = pytz.timezone('Europe/Paris')
+    current_time = datetime.datetime.now(local_timezone).astimezone(pytz.utc)
 
-    #tomorrow_london = current_time_utc + datetime.timedelta(days=1)
-    #tomorrow_date_london = tomorrow_london.date()
+    opening_time = datetime.time(9, 30)
+    closing_time = datetime.time(17, 30)
+    current_day = current_time.strftime("%A")
+    current_date = current_time.date()
 
-    opening_markets = datetime.time(9, 30)
-    closing_markets = datetime.time(17, 30)
+    # Define opening and closing datetimes in UTC
+    datetime_opening = datetime.datetime.combine(current_date, opening_time, tzinfo=datetime.timezone.utc)
+    datetime_closing = datetime.datetime.combine(current_date, closing_time, tzinfo=datetime.timezone.utc)
 
-    datetime_opening_markets = datetime.datetime.combine(current_time_utc, opening_markets)
-    datetime_closing_markets = datetime.datetime.combine(current_time_utc, closing_markets)
-
-    time_util_the_markets_open = calculate_time_difference(datetime_opening_markets.time())
-    current_time = datetime.datetime.now().replace(microsecond=0)
-
-    date_when_the_markets_open = current_time_utc + time_util_the_markets_open
-    date_when_the_markets_open = date_when_the_markets_open.replace(microsecond=0)
-
-    current_day = current_time_utc.strftime("%A")
-    current_date = datetime.datetime.now().date()
-
-    #print(f"\nToday is {current_day} {current_time} \n")
-
-    #print(f"Market Open:\t{date_when_the_markets_open}")
-    #print(f"Hours Remaining:\t{time_util_the_markets_open}\n")
-
-    if datetime_opening_markets <= current_time <= datetime_closing_markets and not is_us_holiday(current_time) and not is_weekend():
-        if print_event: print(f"The market is OPEN. Until {datetime_closing_markets}")
+    # Market open conditions
+    if datetime_opening <= current_time <= datetime_closing and not is_us_holiday(current_date) and not is_weekend():
+        if print_event:
+            print(f"The market is OPEN until {datetime_closing.time()} UTC.")
         return True
-    
+
+    # Print closing reasons
     if is_us_holiday(current_date):
-        if print_event: print("The market is closed. It's a holiday in the US.")
-        return False
-    
-    if current_day == "Saturday":
-        if print_event: print(f"The market is closed. It's Saturday. It will open on Monday at {datetime_opening_markets}.")
-        return False
+        if print_event:
+            print("The market is closed. It's a holiday in the US.")
+    elif current_day == "Saturday":
+        if print_event:
+            print("The market is closed. It's Saturday. It will open on Monday at 09:30 UTC.")
+    elif current_day == "Sunday":
+        if print_event:
+            print("The market is closed. It's Sunday. It will open on Monday at 09:30 UTC.")
+    else:
+        if print_event:
+            print("The market is closed.")
 
-    if current_day == "Sunday":
-        if print_event: print(f"The market is closed. It's Sunday. It will open at {datetime_opening_markets} tomorrow.")
-        return False
+    return False
 
-    if (datetime_opening_markets >= current_time or current_time >= datetime_closing_markets) and not is_us_holiday(current_time) and not is_weekend():
-        if print_event: print(f"The market is closed.")
-        return False
-
-########## EXECUTE AT SCREEN ##########
-import time
-import os
 
 def clear_screen():
-    # Clear screen command for different operating systems
+    """
+    Clears the console screen based on the operating system.
+    """
     command = "cls" if os.name == "nt" else "clear"
-
-    # Execute the command to clear the screen
     os.system(command)
+
 
 if __name__ == "__main__":
     while True:
